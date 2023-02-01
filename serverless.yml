@@ -1,0 +1,55 @@
+service: business-api
+
+custom: 
+  tableName: 'services-table-${self:provider.stage}'
+  dynamodb:
+    start:
+      migrate: true
+
+plugins:
+  - serverless-offline
+  - serverless-dynamodb-local
+
+frameworkVersion: '3'
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+  stage: dev
+  iamRoleStatements:
+    - Effect: Allow
+      Action: 
+        - dynamodb:Query
+        - dynamodb:Scan
+        - dynamodb:GetItem
+        - dynamodb:PutItem
+        - dynamodb:UpdateItem
+        - dynamodb:DeleteItem
+      Resource:
+        - { "Fn::GetAtt": ["ServicesDynamoDBTable", "Arn"] }
+  environment:
+    SERVICES_TABLE: ${self:custom.tableName}
+
+functions:
+  app:
+    handler: handler.generic
+    events: 
+      - http: ANY /
+      - http: ANY /{proxy+}
+  
+
+resources:
+  Resources:
+    ServicesDynamoDBTable:
+      Type: 'AWS::DynamoDB::Table'
+      Properties:
+        AttributeDefinitions:
+          - AttributeName: serviceId
+            AttributeType: S
+        KeySchema:
+          - AttributeName: serviceId
+            KeyType: HASH
+        ProvisionedThroughput:
+          ReadCapacityUnits: 1
+          WriteCapacityUnits: 1
+        TableName: ${self:custom.tableName}
