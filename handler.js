@@ -29,14 +29,16 @@ app.use(bodyParser.urlencoded({ extended: true }));
 /* Metodo POST */
 app.post('/services', (req, res)=>{
   const serviceId = uuidv4();
-  const {title, description} = req.body;
-
+  const {author,title, description,rate,imageUrl} = req.body;
   const params = {
     TableName: SERVICES_TABLE,
     Item: {
-      serviceId, 
+      serviceId,
+      author,
       title,
-      description
+      description,
+      rate,
+      imageUrl
     }
   };
 
@@ -47,7 +49,7 @@ app.post('/services', (req, res)=>{
         error: 'No se ha podido crear el servicio'
       })
     }else{
-      res.json({serviceId, title, description});
+      res.json({serviceId,author,title, description,rate,imageUrl});
     }
   });
 
@@ -57,17 +59,20 @@ app.post('/services', (req, res)=>{
 /* Metodo PUT*/
 app.put('/services/:serviceId', (req, res)=>{
   const {serviceId} = req.params;
-  const {title, description} = req.body;
+  const {author,title, description,rate,imageUrl} = req.body;
 
   const params = {
     TableName: SERVICES_TABLE,
     Key: {
       serviceId
     },
-    UpdateExpression: "set title = :title, description = :description",
+    UpdateExpression: "set author = :author, title = :title, description = :description, rate = :rate, imageUrl = :imageUrl",
     ExpressionAttributeValues: {
+      ":author": author,
       ":title": title,
-      ":description": description
+      ":description": description,
+      ":rate": rate,
+      ":imageUrl": imageUrl
     },
     ReturnValues: "UPDATED_NEW"
   };
@@ -82,6 +87,52 @@ app.put('/services/:serviceId', (req, res)=>{
       res.json(data);
     }
   });
+});
+
+/* Metodo PUT para la califar un servicio*/
+app.put('/services/rate/:serviceId', (req, res)=>{
+  const {serviceId} = req.params;
+  const {rate} = req.body;
+  const params = {
+    TableName: SERVICES_TABLE,
+    Key: {
+      serviceId: req.params.serviceId
+    }
+  }
+  dynamoDB.get(params, (error, data)=>{
+    if(error){
+      console.log(error);
+      res.status(400).json({
+        error: 'No se ha podido obtener el servicio'
+      });
+    } else {
+      const oldRate = data.Item.rate;
+      const medianRate = Math.round((parseInt(oldRate) + parseInt(rate)) / 2);
+
+      const putParams = {
+        TableName: SERVICES_TABLE,
+        Key: {
+          serviceId
+        },
+        UpdateExpression: "set rate = :rate",
+        ExpressionAttributeValues: {
+          ":rate": medianRate
+        },
+        ReturnValues: "UPDATED_NEW"
+      };
+
+      dynamoDB.update(putParams, (error, data) => {
+        if (error) {
+          console.log(error);
+          res.status(400).json({
+            error: 'No se ha podido actualizar el servicio'
+          });
+        } else {
+          res.json(data);
+        }
+      });
+    }
+  })
 });
 
 /* Metodo GET para todos los servicios*/
@@ -125,8 +176,8 @@ app.get('/services/:serviceId', (req,res)=>{
         error: 'No se ha podido obtener el servicio'
       })
     }if(result.Item){
-      const {serviceId, title, description} = result.Item;
-      return res.json({serviceId, title, description});
+      const {serviceId, author,title, description,rate,imageUrl} = result.Item;
+      return res.json({serviceId, author,title, description,rate,imageUrl});
     }else{
       res.status(404).json({
         error: 'Servicio no encontrado'
