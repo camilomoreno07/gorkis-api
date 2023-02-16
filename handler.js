@@ -4,6 +4,7 @@ const express = require('express');
 const app = express();
 const AWS = require('aws-sdk');
 const bodyParser = require('body-parser');
+const cors = require('cors')
 const { v4: uuidv4 } = require('uuid');
 
 
@@ -24,6 +25,7 @@ if(IS_OFFLINE ==true){
 
 
 app.use(bodyParser.urlencoded({ extended: true }));
+app.use(cors());
 
 
 /* Metodo POST */
@@ -57,33 +59,73 @@ app.post('/services', (req, res)=>{
 
 
 /* Metodo PUT*/
-app.put('/services/:serviceId', (req, res)=>{
-  const {serviceId} = req.params;
-  const {author,title, description,rate,imageUrl} = req.body;
+app.put('/services/:serviceId', (req, res) => {
+  const { serviceId } = req.params;
+  const { author, title, description, rate, imageUrl } = req.body;
+  const updateExpressionParts = [];
+
+  // Construir una expresión de actualización solo para los campos proporcionados en la solicitud
+  if (author) {
+    updateExpressionParts.push('#a = :author');
+  }
+  if (title) {
+    updateExpressionParts.push('#t = :title');
+  }
+  if (description) {
+    updateExpressionParts.push('#d = :description');
+  }
+  if (rate) {
+    updateExpressionParts.push('#r = :rate');
+  }
+  if (imageUrl) {
+    updateExpressionParts.push('#i = :imageUrl');
+  }
+
+  const updateExpression = `SET ${updateExpressionParts.join(', ')}`;
+
+  const expressionAttributeValues = {};
+  const expressionAttributeNames = {};
+
+  // Agregar los valores y los nombres de atributos solo para los campos proporcionados en la solicitud
+  if (author) {
+    expressionAttributeValues[':author'] = author;
+    expressionAttributeNames['#a'] = 'author';
+  }
+  if (title) {
+    expressionAttributeValues[':title'] = title;
+    expressionAttributeNames['#t'] = 'title';
+  }
+  if (description) {
+    expressionAttributeValues[':description'] = description;
+    expressionAttributeNames['#d'] = 'description';
+  }
+  if (rate) {
+    expressionAttributeValues[':rate'] = rate;
+    expressionAttributeNames['#r'] = 'rate';
+  }
+  if (imageUrl) {
+    expressionAttributeValues[':imageUrl'] = imageUrl;
+    expressionAttributeNames['#i'] = 'imageUrl';
+  }
 
   const params = {
     TableName: SERVICES_TABLE,
     Key: {
-      serviceId
+      serviceId,
     },
-    UpdateExpression: "set author = :author, title = :title, description = :description, rate = :rate, imageUrl = :imageUrl",
-    ExpressionAttributeValues: {
-      ":author": author,
-      ":title": title,
-      ":description": description,
-      ":rate": rate,
-      ":imageUrl": imageUrl
-    },
-    ReturnValues: "UPDATED_NEW"
+    UpdateExpression: updateExpression,
+    ExpressionAttributeNames: expressionAttributeNames,
+    ExpressionAttributeValues: expressionAttributeValues,
+    ReturnValues: 'UPDATED_NEW',
   };
 
-  dynamoDB.update(params, (error, data)=>{
-    if(error){
+  dynamoDB.update(params, (error, data) => {
+    if (error) {
       console.log(error);
       res.status(400).json({
-        error: 'No se ha podido actualizar el servicio'
-      })
-    }else{
+        error: 'No se ha podido actualizar el servicio',
+      });
+    } else {
       res.json(data);
     }
   });
